@@ -91,6 +91,14 @@ class SoeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(syncing = true, error = null)
             try {
+                // O evento pode ter sido cadastrado na web depois que o aparelho
+                // ja estava logado. Reresolver aqui e o que torna verdadeira a
+                // instrucao "sincronize na tela inicial" que as telas exibem
+                // quando nao ha evento ativo.
+                if (session.value?.eventId == null) {
+                    repository.resolveAssignment()
+                }
+
                 val result = container.syncRepository.sync()
                 val rejected = result.rejected.size
                 _uiState.value = _uiState.value.copy(

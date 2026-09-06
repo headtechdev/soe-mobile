@@ -1,8 +1,10 @@
 package br.com.soe.campo.data
 
 import android.content.Context
+import br.com.soe.campo.BuildConfig
 import br.com.soe.campo.data.local.*
 import br.com.soe.campo.data.remote.LoginRequest
+import br.com.soe.campo.data.remote.RemoteProfile
 import br.com.soe.campo.data.remote.SoeApi
 import kotlinx.coroutines.flow.Flow
 import java.io.File
@@ -33,7 +35,7 @@ class FieldRepository(
                 installationId = installationId,
                 model = android.os.Build.MODEL,
                 osVersion = android.os.Build.VERSION.RELEASE,
-                appVersion = "1.0.0",
+                appVersion = BuildConfig.VERSION_NAME,
             ),
         )
 
@@ -45,9 +47,36 @@ class FieldRepository(
             userRole = response.user.role,
         )
 
+        // O login so vale depois que a escala esta resolvida. Gravar o token e
+        // falhar aqui deixava o app "logado" porem sem evento — e como a rota
+        // inicial olha apenas o token, o operador reabria direto numa Home vazia,
+        // sem nada que explicasse o estado. Preferimos desfazer e deixa-lo tentar
+        // de novo.
+        try {
+            resolveAssignment(api, response.profile)
+        } catch (error: Exception) {
+            session.logout()
+            throw error
+        }
+    }
+
+    /**
+     * Descobre em qual evento este usuario esta operando.
+     *
+     * Roda no login e tambem no sincronismo, porque o vinculo costuma ser criado
+     * na web depois que o aparelho ja esta em campo. Obrigar o operador a sair e
+     * entrar de novo para enxergar o evento e um pedido que nao se faz no meio de
+     * uma operacao.
+     *
+     * @return true se um evento ficou ativo.
+     */
+    suspend fun resolveAssignment(
+        api: SoeApi? = null,
+        profile: RemoteProfile? = null,
+    ): Boolean {
         // O perfil vem no proprio login quando o usuario esta vinculado a uma
         // pessoa do evento; senao caimos no bootstrap para escolher o evento.
-        response.profile?.let { profile ->
+        if (profile != null) {
             session.saveAssignment(
                 eventId = profile.eventId,
                 eventName = profile.eventName,
@@ -57,10 +86,12 @@ class FieldRepository(
                 shiftName = profile.shift?.name,
                 badge = profile.badgeCode,
             )
-            return
+            return true
         }
 
-        val bootstrap = api.bootstrap()
+        // So agora precisamos de rede: quando o proprio login ja trouxe o perfil,
+        // nem chegamos aqui.
+        val bootstrap = (api ?: apiProvider()).bootstrap()
         val assignment = bootstrap.assignments.firstOrNull()
         if (assignment != null) {
             session.saveAssignment(
@@ -72,7 +103,7 @@ class FieldRepository(
                 shiftName = assignment.shift?.name,
                 badge = assignment.badgeCode,
             )
-            return
+            return true
         }
 
         val fallback = bootstrap.events.firstOrNull()
@@ -87,6 +118,7 @@ class FieldRepository(
             shiftName = null,
             badge = null,
         )
+        return true
     }
 
     suspend fun logout() {
