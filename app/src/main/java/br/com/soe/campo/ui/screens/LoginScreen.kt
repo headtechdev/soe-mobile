@@ -48,9 +48,13 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // safeDrawing cobre barra de status, barra de navegacao e teclado —
+            // o valor fixo que havia aqui era um chute do tamanho da barra de
+            // status e nao reservava nada embaixo.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
-            .padding(top = 48.dp),
+            .padding(top = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(

@@ -143,7 +143,14 @@ fun ChecklistRunScreen(
         bottomBar = {
             if (!readOnly) {
                 Surface(tonalElevation = 3.dp) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Mesmo motivo do ReportIncidentScreen: sem o inset de baixo,
+                    // a barra de navegacao do aparelho cobre os botoes de gravar.
+                    Column(
+                        Modifier
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         if (missingRequired.isNotEmpty()) {
                             Text(
                                 "${missingRequired.size} item(ns) obrigatorio(s) sem resposta",

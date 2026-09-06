@@ -116,35 +116,60 @@ fun ReportIncidentScreen(
         topBar = { SoeTopBar("Reportar incidente", onBack = onBack) },
         bottomBar = {
             Surface(tonalElevation = 3.dp) {
-                Button(
-                    onClick = {
-                        val currentEvent = eventId ?: return@Button
-                        saving = true
-                        scope.launch {
-                            repository.reportIncident(
-                                eventId = currentEvent,
-                                title = title.trim(),
-                                description = description.trim().ifBlank { null },
-                                type = type,
-                                severity = severity,
-                                areaId = areaId,
-                                locationDescription = locationText.trim().ifBlank { null },
-                                latitude = latitude,
-                                longitude = longitude,
-                                photoPaths = photos,
-                            )
-                            SyncWorker.syncNow(context)
-                            saving = false
-                            onDone()
-                        }
-                    },
-                    enabled = !saving && title.isNotBlank() && eventId != null,
+                Column(
+                    // O app desenha sob as barras do sistema (enableEdgeToEdge, e
+                    // obrigatorio no targetSdk 35). Sem reservar o inset de baixo,
+                    // a barra de navegacao do aparelho cobre justamente o botao de
+                    // salvar: o operador toca e nada acontece.
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .height(52.dp),
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(if (saving) "Registrando..." else "Registrar ocorrencia")
+                    // Botao cinza sem explicacao e um beco sem saida em campo.
+                    val impedimento = when {
+                        eventId == null -> "Nenhum evento ativo. Sincronize na tela inicial."
+                        title.isBlank() -> "Informe o titulo da ocorrencia para registrar."
+                        else -> null
+                    }
+
+                    if (impedimento != null) {
+                        Text(
+                            impedimento,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val currentEvent = eventId ?: return@Button
+                            saving = true
+                            scope.launch {
+                                repository.reportIncident(
+                                    eventId = currentEvent,
+                                    title = title.trim(),
+                                    description = description.trim().ifBlank { null },
+                                    type = type,
+                                    severity = severity,
+                                    areaId = areaId,
+                                    locationDescription = locationText.trim().ifBlank { null },
+                                    latitude = latitude,
+                                    longitude = longitude,
+                                    photoPaths = photos,
+                                )
+                                SyncWorker.syncNow(context)
+                                saving = false
+                                onDone()
+                            }
+                        },
+                        enabled = !saving && impedimento == null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                    ) {
+                        Text(if (saving) "Registrando..." else "Registrar ocorrencia")
+                    }
                 }
             }
         },
