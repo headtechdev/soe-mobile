@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Marca do SOE: escudo operacional com o pulso de "ao vivo" no centro. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28L74,36L74,54C74,66 65.5,75.5 54,80C42.5,75.5 34,66 34,54L34,36L54,28Z" />
+
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M54,46m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0" />
+</vector>
