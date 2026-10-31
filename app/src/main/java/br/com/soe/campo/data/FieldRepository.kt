@@ -1,12 +1,16 @@
 package br.com.soe.campo.data
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import br.com.soe.campo.BuildConfig
 import br.com.soe.campo.data.local.*
 import br.com.soe.campo.data.remote.LoginRequest
 import br.com.soe.campo.data.remote.RemoteProfile
 import br.com.soe.campo.data.remote.SoeApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -253,10 +257,51 @@ class FieldRepository(
     }
 
     /** Arquivo de destino da proxima foto, dentro do diretorio privado. */
-    fun newPhotoFile(): File {
+    fun newPhotoFile(): File = newEvidenceFile("jpg")
+
+    /** Idem para video — evidencia de ronda e de condicao de trabalho. */
+    fun newVideoFile(): File = newEvidenceFile("mp4")
+
+    private fun newEvidenceFile(extension: String): File {
         val dir = File(context.filesDir, "evidencias").apply { mkdirs() }
-        return File(dir, "${System.currentTimeMillis()}.jpg")
+        return File(dir, "${System.currentTimeMillis()}.$extension")
     }
+
+    /**
+     * Copia para o diretorio privado um arquivo escolhido pelo usuario.
+     *
+     * O Uri do seletor nao sobrevive ao fim do processo, e o upload acontece
+     * no proximo sincronismo — que pode ser horas depois, com o app ja
+     * reaberto. Guardar so o Uri perderia a evidencia em silencio.
+     *
+     * @return par (caminho local, mime type) ou null se o arquivo nao pode
+     *   ser lido.
+     */
+    suspend fun copyToEvidence(uri: Uri): Pair<String, String>? = withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        val mime = resolver.getType(uri) ?: "application/octet-stream"
+        val name = queryDisplayName(uri) ?: "evidencia-${System.currentTimeMillis()}"
+
+        val dir = File(context.filesDir, "evidencias").apply { mkdirs() }
+        val target = File(dir, "${System.currentTimeMillis()}-${name.takeLast(60)}")
+
+        runCatching {
+            resolver.openInputStream(uri)?.use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            } ?: return@withContext null
+        }.getOrElse { return@withContext null }
+
+        target.absolutePath to mime
+    }
+
+    private fun queryDisplayName(uri: Uri): String? =
+        runCatching {
+            context.contentResolver
+                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                }
+        }.getOrNull()
 
     // -------------------------------------------------------- Checklists
 

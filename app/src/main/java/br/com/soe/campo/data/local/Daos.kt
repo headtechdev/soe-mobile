@@ -192,6 +192,9 @@ interface AlertDao {
     @Query("SELECT COUNT(*) FROM alerts WHERE eventId = :eventId AND deleted = 0 AND readAtMs IS NULL")
     fun countUnread(eventId: String): Flow<Int>
 
+    @Query("SELECT * FROM alerts WHERE eventId = :eventId AND deleted = 0")
+    suspend fun all(eventId: String): List<AlertEntity>
+
     @Query("UPDATE alerts SET readAtMs = :readAt, pendingSync = 1 WHERE id = :id AND readAtMs IS NULL")
     suspend fun markRead(id: String, readAt: Long)
 

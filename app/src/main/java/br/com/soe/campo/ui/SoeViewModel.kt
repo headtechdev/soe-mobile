@@ -8,9 +8,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import br.com.soe.campo.SoeApplication
 import br.com.soe.campo.data.SessionStore
+import br.com.soe.campo.data.local.SyncRejectionEntity
 import br.com.soe.campo.sync.SyncWorker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +29,8 @@ class SoeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val container = (application as SoeApplication).container
     private val repository = container.fieldRepository
+    private val mobility = container.mobilityRepository
+    private val sustainability = container.sustainabilityRepository
 
     val session: StateFlow<SessionStore.Session?> = container.sessionStore.session
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -49,13 +53,52 @@ class SoeViewModel(application: Application) : AndroidViewModel(application) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /**
+     * Fila local completa: ocorrencias, logistica e sustentabilidade. O
+     * operador precisa de um numero so — "o que ainda nao subiu" —, nao de
+     * um contador por modulo.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val pendingUploads: StateFlow<Int> = session
         .flatMapLatest { current ->
             val eventId = current?.eventId ?: return@flatMapLatest flowOf(0)
-            repository.observePendingIncidents(eventId)
+            combine(
+                repository.observePendingIncidents(eventId),
+                mobility.observePending(),
+                sustainability.observePending(),
+            ) { incidents, trips, tasks -> incidents + trips + tasks }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** Missoes de logistica em aberto atribuidas ao operador. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val openTrips: StateFlow<Int> = session
+        .flatMapLatest { current ->
+            val eventId = current?.eventId ?: return@flatMapLatest flowOf(0)
+            mobility.observeOpenTrips(eventId)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** Itens obrigatorios de DH & Sustentabilidade ainda sem resposta. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val openSustainability: StateFlow<Int> = session
+        .flatMapLatest { current ->
+            val eventId = current?.eventId ?: return@flatMapLatest flowOf(0)
+            sustainability.observeOpenRequired(eventId)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /**
+     * Registros que o servidor recusou. Ficam visiveis ate alguem resolver:
+     * sumir com eles seria a perda silenciosa que os dois modulos proibem.
+     */
+    val syncConflicts: StateFlow<List<SyncRejectionEntity>> =
+        container.database.syncRejectionDao().observeOpen()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun resolveConflict(id: String) {
+        viewModelScope.launch { container.database.syncRejectionDao().resolve(id) }
+    }
 
     val pendingPhotos: StateFlow<Int> = repository.observePendingAttachments()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)

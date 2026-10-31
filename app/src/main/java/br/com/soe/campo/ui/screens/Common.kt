@@ -66,6 +66,79 @@ val ALERT_LEVELS = mapOf(
     "CRITICAL" to "Critico",
 )
 
+// -------------------------------------------- Logistica & Mobilidade
+
+val TRIP_SERVICES = mapOf(
+    "SHUTTLE" to "Shuttle",
+    "TRANSFER" to "Transfer",
+    "FLEET" to "Frota",
+)
+
+val TRIP_STATUS = mapOf(
+    "SCHEDULED" to "Programada",
+    "CHECKED_IN" to "Check-in feito",
+    "IN_PROGRESS" to "Em viagem",
+    "COMPLETED" to "Encerrada",
+    "CANCELLED" to "Cancelada",
+)
+
+val PASSENGER_STATUS = mapOf(
+    "EXPECTED" to "Esperado",
+    "BOARDED" to "Embarcado",
+    "DROPPED" to "Desembarcado",
+    "NO_SHOW" to "Ausente",
+    "EXTRA" to "Adicional",
+    "REFUSED" to "Recusou embarque",
+)
+
+/** Categorias de ocorrencia da secao 4.7 (trafego, veiculo, passageiro...). */
+val MOBILITY_INCIDENT_TYPES = listOf(
+    "LOGISTICS" to "Transito / via",
+    "TECHNICAL" to "Veiculo (pane, avaria)",
+    "CROWD" to "Passageiro",
+    "SECURITY" to "Seguranca",
+    "MEDICAL" to "Emergencia medica",
+    "OTHER" to "Operacao / outro",
+)
+
+// ------------------------------ Direitos Humanos & Sustentabilidade
+
+val SUSTAINABILITY_PHASES = mapOf(
+    "PRE_EVENT" to "Pre-evento",
+    "LIVE" to "Durante o evento",
+    "POST_EVENT" to "Pos-evento",
+)
+
+val SUSTAINABILITY_CRITERIA = mapOf(
+    "REQUIRED" to "Obrigatorio",
+    "RECOMMENDED" to "Recomendado",
+    "NOT_APPLICABLE" to "Nao aplicavel",
+)
+
+val SUSTAINABILITY_PRIORITIES = mapOf(
+    "CRITICAL" to "Critica",
+    "HIGH" to "Alta",
+    "MEDIUM" to "Media",
+    "LOW" to "Baixa",
+)
+
+val SUSTAINABILITY_STATUS = mapOf(
+    "NOT_STARTED" to "Nao iniciado",
+    "IN_PROGRESS" to "Em andamento",
+    "DONE" to "Atendido",
+    "NOT_DONE" to "Nao atendido",
+    "NOT_APPLICABLE" to "Nao aplicavel",
+    "IN_VALIDATION" to "Em validacao",
+)
+
+/** Respostas que o app pode registrar; "em validacao" so vem do servidor. */
+val SUSTAINABILITY_ANSWERS = listOf(
+    "DONE" to "Atendido",
+    "IN_PROGRESS" to "Em andamento",
+    "NOT_DONE" to "Nao atendido",
+    "NOT_APPLICABLE" to "Nao aplicavel",
+)
+
 fun labelOf(map: Map<String, String>, key: String?): String =
     key?.let { map[it] ?: it } ?: "-"
 
@@ -124,6 +197,53 @@ fun SoeTopBar(
         },
         actions = actions,
     )
+}
+
+/** Grade de escolha unica. Nasceu no registro de ocorrencia e virou padrao. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ChipGrid(
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    enabled: Boolean = true,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        options.forEach { (value, label) ->
+            FilterChip(
+                selected = selected == value,
+                onClick = { onSelect(value) },
+                enabled = enabled,
+                label = { Text(label) },
+            )
+        }
+    }
+}
+
+/**
+ * Linha rotulo/valor dos cabecalhos de missao e tarefa. Em campo o operador
+ * le de relance, entao o rotulo fica pequeno e o valor em destaque.
+ */
+@Composable
+fun InfoRow(label: String, value: String?, modifier: Modifier = Modifier) {
+    if (value.isNullOrBlank()) return
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.widthIn(min = 92.dp),
+        )
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 @Composable

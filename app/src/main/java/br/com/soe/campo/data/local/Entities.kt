@@ -206,6 +206,24 @@ data class PendingAttachmentEntity(
     val uploaded: Boolean = false,
 )
 
+/**
+ * Registro recusado pelo servidor no push.
+ *
+ * Sem isto o item sumia da fila e o operador nunca sabia — exatamente a
+ * "perda silenciosa" que o modulo de Sustentabilidade proibe. O registro fica
+ * aqui ate alguem resolver, e a tela de pendencias mostra o motivo.
+ */
+@Entity(tableName = "sync_rejections")
+data class SyncRejectionEntity(
+    @PrimaryKey val id: String,
+    val eventId: String,
+    val collection: String,
+    val recordId: String,
+    val reason: String,
+    val rejectedAtMs: Long,
+    val resolved: Boolean = false,
+)
+
 /** Marca d'agua do pull incremental por evento. */
 @Entity(tableName = "sync_state")
 data class SyncStateEntity(

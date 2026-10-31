@@ -31,6 +31,9 @@ fun HomeScreen(
     onOpenChecklists: () -> Unit,
     onOpenAlerts: () -> Unit,
     onOpenProfile: () -> Unit,
+    onOpenMissions: () -> Unit,
+    onOpenSustainability: () -> Unit,
+    onOpenSyncQueue: () -> Unit,
 ) {
     val session by viewModel.session.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -38,6 +41,9 @@ fun HomeScreen(
     val pending by viewModel.pendingUploads.collectAsStateWithLifecycle()
     val pendingPhotos by viewModel.pendingPhotos.collectAsStateWithLifecycle()
     val lastSync by viewModel.lastSyncAt.collectAsStateWithLifecycle()
+    val openTrips by viewModel.openTrips.collectAsStateWithLifecycle()
+    val openSustainability by viewModel.openSustainability.collectAsStateWithLifecycle()
+    val conflicts by viewModel.syncConflicts.collectAsStateWithLifecycle()
 
     val snackbar = remember { SnackbarHostState() }
 
@@ -91,7 +97,34 @@ fun HomeScreen(
                 pendingPhotos = pendingPhotos,
                 syncing = state.syncing,
                 onSync = { viewModel.syncNow() },
+                onOpenQueue = onOpenSyncQueue,
             )
+
+            // Conflito nao pode ficar escondido atras de um contador: o
+            // registro foi recusado e alguem precisa agir.
+            if (conflicts.isNotEmpty()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenSyncQueue),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(Icons.Default.SyncProblem, contentDescription = null)
+                        Text(
+                            "${conflicts.size} registro(s) recusado(s) pelo servidor",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    }
+                }
+            }
 
             BigActionCard(
                 title = "Reportar incidente",
@@ -107,6 +140,32 @@ fun HomeScreen(
                 icon = Icons.Default.ChecklistRtl,
                 color = MaterialTheme.colorScheme.primary,
                 onClick = onOpenChecklists,
+            )
+
+            BigActionCard(
+                title = "Logistica e mobilidade",
+                subtitle = if (openTrips > 0) {
+                    "$openTrips missao(oes) em aberto · embarque, veiculo e estacionamento"
+                } else {
+                    "Missoes, embarque, veiculo e estacionamento."
+                },
+                icon = Icons.Default.DirectionsBus,
+                color = Color(0xFF2563EB),
+                badge = openTrips,
+                onClick = onOpenMissions,
+            )
+
+            BigActionCard(
+                title = "DH e Sustentabilidade",
+                subtitle = if (openSustainability > 0) {
+                    "$openSustainability item(ns) obrigatorio(s) em aberto"
+                } else {
+                    "Verificacoes socioambientais e evidencias."
+                },
+                icon = Icons.Default.Eco,
+                color = Color(0xFF059669),
+                badge = openSustainability,
+                onClick = onOpenSustainability,
             )
 
             BigActionCard(
@@ -150,6 +209,7 @@ private fun SyncStatusCard(
     pendingPhotos: Int,
     syncing: Boolean,
     onSync: () -> Unit,
+    onOpenQueue: () -> Unit,
 ) {
     val totalPending = pendingRecords + pendingPhotos
     val container = if (totalPending > 0) {
@@ -161,7 +221,9 @@ private fun SyncStatusCard(
     Surface(
         color = container,
         shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenQueue),
     ) {
         Row(
             modifier = Modifier.padding(14.dp),

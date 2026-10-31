@@ -3,7 +3,9 @@ package br.com.soe.campo
 import android.app.Application
 import android.content.Context
 import br.com.soe.campo.data.FieldRepository
+import br.com.soe.campo.data.MobilityRepository
 import br.com.soe.campo.data.SessionStore
+import br.com.soe.campo.data.SustainabilityRepository
 import br.com.soe.campo.data.SyncRepository
 import br.com.soe.campo.data.local.SoeDatabase
 import br.com.soe.campo.data.remote.ApiFactory
@@ -55,6 +57,14 @@ class AppContainer(private val context: Context) {
 
     val fieldRepository: FieldRepository by lazy {
         FieldRepository(context, database, sessionStore) { api() }
+    }
+
+    val mobilityRepository: MobilityRepository by lazy {
+        MobilityRepository(database, fieldRepository)
+    }
+
+    val sustainabilityRepository: SustainabilityRepository by lazy {
+        SustainabilityRepository(database, fieldRepository)
     }
 
     val syncRepository: SyncRepository by lazy {

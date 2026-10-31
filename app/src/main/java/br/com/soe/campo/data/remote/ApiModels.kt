@@ -108,6 +108,14 @@ data class PullResponse(
     val incidents: List<RemoteIncident> = emptyList(),
     val alerts: List<RemoteAlert> = emptyList(),
     val alertReceipts: List<RemoteAlertReceipt> = emptyList(),
+    // Logistica & Mobilidade
+    val vehicles: List<RemoteVehicle> = emptyList(),
+    val trips: List<RemoteTrip> = emptyList(),
+    val tripStops: List<RemoteTripStop> = emptyList(),
+    val tripPassengers: List<RemoteTripPassenger> = emptyList(),
+    val parkingSectors: List<RemoteParkingSector> = emptyList(),
+    // Direitos Humanos & Sustentabilidade
+    val sustainabilityTasks: List<RemoteSustainabilityTask> = emptyList(),
 )
 
 @Serializable
@@ -280,6 +288,125 @@ data class RemoteAlertReceipt(
     val acknowledgedAt: String? = null,
 )
 
+// -------------------------------------- Pull: Logistica & Mobilidade
+
+@Serializable
+data class RemoteVehicle(
+    val id: String,
+    val eventId: String,
+    val code: String,
+    val type: String,
+    val plate: String? = null,
+    val model: String? = null,
+    val color: String? = null,
+    val capacity: Int? = null,
+    val accessible: Boolean = false,
+    val armored: Boolean = false,
+    val companyName: String? = null,
+    val status: String,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
+@Serializable
+data class RemoteTrip(
+    val id: String,
+    val eventId: String,
+    val code: String,
+    val service: String,
+    val vehicleId: String? = null,
+    val driverPersonId: String? = null,
+    val routeName: String? = null,
+    val originName: String? = null,
+    val destinationName: String? = null,
+    val scheduledStart: String? = null,
+    val scheduledEnd: String? = null,
+    val status: String,
+    val checkedInAt: String? = null,
+    val startedAt: String? = null,
+    val finishedAt: String? = null,
+    val odometerStart: Int? = null,
+    val odometerEnd: Int? = null,
+    val fuelStart: Int? = null,
+    val fuelEnd: Int? = null,
+    val capacity: Int? = null,
+    val aggregateBoarded: Int? = null,
+    val vehicleReturned: Boolean = false,
+    val notes: String? = null,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
+@Serializable
+data class RemoteTripStop(
+    val id: String,
+    val tripId: String,
+    val sortOrder: Int,
+    val name: String,
+    val kind: String = "STOP",
+    val scheduledAt: String? = null,
+    val arrivedAt: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val instructions: String? = null,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
+@Serializable
+data class RemoteTripPassenger(
+    val id: String,
+    val tripId: String,
+    val personId: String? = null,
+    val name: String,
+    val badgeCode: String? = null,
+    val boardingStopName: String? = null,
+    val status: String,
+    val boardedAt: String? = null,
+    val droppedAt: String? = null,
+    val boardedStopName: String? = null,
+    val notes: String? = null,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
+@Serializable
+data class RemoteParkingSector(
+    val id: String,
+    val eventId: String,
+    val name: String,
+    val capacity: Int? = null,
+    val occupied: Int? = null,
+    val blocked: Boolean = false,
+    val notes: String? = null,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
+// --------------------- Pull: Direitos Humanos & Sustentabilidade
+
+@Serializable
+data class RemoteSustainabilityTask(
+    val id: String,
+    val eventId: String,
+    val theme: String,
+    val subtheme: String? = null,
+    val title: String,
+    val description: String? = null,
+    val phase: String,
+    val criterion: String,
+    val priority: String,
+    val status: String,
+    val dueAt: String? = null,
+    val responsibleName: String? = null,
+    val areaId: String? = null,
+    val locationName: String? = null,
+    val recurring: Boolean = false,
+    val requiresEvidence: Boolean = false,
+    val updatedAt: String,
+    val deletedAt: String? = null,
+)
+
 // ------------------------------------------------------------------- Push
 
 @Serializable
@@ -291,6 +418,124 @@ data class PushRequest(
     val attachments: List<PushAttachment> = emptyList(),
     val alertReceipts: List<PushReceipt> = emptyList(),
     val personStatus: List<PushPersonStatus> = emptyList(),
+    // Logistica & Mobilidade
+    val trips: List<PushTrip> = emptyList(),
+    val tripStops: List<PushTripStop> = emptyList(),
+    val tripPassengers: List<PushTripPassenger> = emptyList(),
+    val vehicleChecks: List<PushVehicleCheck> = emptyList(),
+    val parkingAccesses: List<PushParkingAccess> = emptyList(),
+    // Direitos Humanos & Sustentabilidade
+    val sustainabilityUpdates: List<PushSustainabilityUpdate> = emptyList(),
+)
+
+@Serializable
+data class PushTrip(
+    val id: String,
+    val status: String,
+    val checkedInAt: String? = null,
+    val startedAt: String? = null,
+    val finishedAt: String? = null,
+    val odometerStart: Int? = null,
+    val odometerEnd: Int? = null,
+    val fuelStart: Int? = null,
+    val fuelEnd: Int? = null,
+    val aggregateBoarded: Int? = null,
+    val vehicleReturned: Boolean = false,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val notes: String? = null,
+    val clientCreatedAt: String? = null,
+)
+
+@Serializable
+data class PushTripStop(
+    val id: String,
+    val tripId: String,
+    val sortOrder: Int,
+    val name: String,
+    val kind: String,
+    val scheduledAt: String? = null,
+    val arrivedAt: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val clientCreatedAt: String? = null,
+)
+
+@Serializable
+data class PushTripPassenger(
+    val id: String,
+    val tripId: String,
+    val personId: String? = null,
+    val name: String,
+    val status: String,
+    val boardedAt: String? = null,
+    val droppedAt: String? = null,
+    val boardedStopName: String? = null,
+    val notes: String? = null,
+    val clientCreatedAt: String? = null,
+)
+
+@Serializable
+data class PushVehicleCheck(
+    val id: String,
+    val tripId: String? = null,
+    val vehicleId: String? = null,
+    val kind: String,
+    val status: String,
+    val startedAt: String? = null,
+    val completedAt: String? = null,
+    val odometer: Int? = null,
+    val fuelLevel: Int? = null,
+    val blocked: Boolean = false,
+    val overrideReason: String? = null,
+    val overrideAt: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val notes: String? = null,
+    val clientCreatedAt: String? = null,
+    val answers: List<PushVehicleCheckAnswer> = emptyList(),
+)
+
+@Serializable
+data class PushVehicleCheckAnswer(
+    val id: String,
+    val itemKey: String,
+    val answer: String,
+    val critical: Boolean = false,
+    val notes: String? = null,
+    val answeredAt: String? = null,
+)
+
+@Serializable
+data class PushParkingAccess(
+    val id: String,
+    val sectorId: String? = null,
+    val sectorName: String? = null,
+    val credential: String? = null,
+    val plate: String? = null,
+    val direction: String,
+    val authorized: Boolean,
+    val reason: String? = null,
+    val occurredAt: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val notes: String? = null,
+    val clientCreatedAt: String? = null,
+)
+
+@Serializable
+data class PushSustainabilityUpdate(
+    val id: String,
+    val taskId: String,
+    val status: String,
+    val comment: String? = null,
+    val justification: String? = null,
+    val answeredAt: String,
+    val authorName: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val incidentId: String? = null,
+    val clientCreatedAt: String? = null,
 )
 
 @Serializable

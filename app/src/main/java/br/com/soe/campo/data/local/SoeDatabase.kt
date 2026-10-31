@@ -20,8 +20,21 @@ import androidx.room.RoomDatabase
         AlertEntity::class,
         PendingAttachmentEntity::class,
         SyncStateEntity::class,
+        SyncRejectionEntity::class,
+        // Logistica & Mobilidade
+        VehicleEntity::class,
+        TripEntity::class,
+        TripStopEntity::class,
+        TripPassengerEntity::class,
+        VehicleCheckEntity::class,
+        VehicleCheckAnswerEntity::class,
+        ParkingSectorEntity::class,
+        ParkingAccessEntity::class,
+        // Direitos Humanos & Sustentabilidade
+        SustainabilityTaskEntity::class,
+        SustainabilityUpdateEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class SoeDatabase : RoomDatabase() {
@@ -32,6 +45,9 @@ abstract class SoeDatabase : RoomDatabase() {
     abstract fun alertDao(): AlertDao
     abstract fun attachmentDao(): AttachmentDao
     abstract fun syncStateDao(): SyncStateDao
+    abstract fun mobilityDao(): MobilityDao
+    abstract fun sustainabilityDao(): SustainabilityDao
+    abstract fun syncRejectionDao(): SyncRejectionDao
 
     companion object {
         @Volatile

@@ -54,8 +54,19 @@ class SyncRepository(
         val alerts = db.alertDao().pending()
         val people = db.catalogDao().pendingPeople()
 
-        val totalPending =
-            incidents.size + executions.size + attachments.size + alerts.size + people.size
+        val mobility = db.mobilityDao()
+        val trips = mobility.pendingTrips()
+        val stops = mobility.pendingStops()
+        val passengers = mobility.pendingPassengers()
+        val checks = mobility.pendingChecks()
+        val accesses = mobility.pendingAccesses()
+
+        val sustainability = db.sustainabilityDao()
+        val updates = sustainability.pendingUpdates()
+
+        val totalPending = incidents.size + executions.size + attachments.size + alerts.size +
+            people.size + trips.size + stops.size + passengers.size + checks.size +
+            accesses.size + updates.size
         if (totalPending == 0) return 0 to emptyList()
 
         val request = PushRequest(
@@ -81,6 +92,12 @@ class SyncRepository(
                     checkOutAt = Time.toIsoOrNull(it.checkOutAtMs),
                 )
             },
+            trips = trips.map { it.toPush() },
+            tripStops = stops.map { it.toPush() },
+            tripPassengers = passengers.map { it.toPush() },
+            vehicleChecks = checks.map { check -> check.toPush(mobility.checkAnswers(check.id)) },
+            parkingAccesses = accesses.map { it.toPush() },
+            sustainabilityUpdates = updates.map { it.toPush() },
         )
 
         val response = api.push(request)
@@ -94,9 +111,56 @@ class SyncRepository(
         response.accepted["attachments"]?.let { db.attachmentDao().markUploaded(it) }
         response.accepted["alertReceipts"]?.let { db.alertDao().clearPending(it) }
         response.accepted["personStatus"]?.let { db.catalogDao().clearPendingPeople(it) }
+        response.accepted["trips"]?.let { mobility.clearPendingTrips(it) }
+        response.accepted["tripStops"]?.let { mobility.clearPendingStops(it) }
+        response.accepted["tripPassengers"]?.let { mobility.clearPendingPassengers(it) }
+        response.accepted["vehicleChecks"]?.let {
+            mobility.clearPendingChecks(it)
+            mobility.clearPendingCheckAnswers(it)
+        }
+        response.accepted["parkingAccesses"]?.let { mobility.clearPendingAccesses(it) }
+        response.accepted["sustainabilityUpdates"]?.let { ids ->
+            sustainability.clearPendingUpdates(ids)
+            // A tarefa so sai da fila quando a resposta dela foi aceita.
+            val taskIds = updates.filter { it.id in ids }.map { it.taskId }.distinct()
+            if (taskIds.isNotEmpty()) sustainability.clearPendingTasks(taskIds)
+        }
 
-        val accepted = response.accepted.values.sumOf { it.size }
+        // Um registro reenviado e agora aceito deixa de ser conflito.
+        val acceptedIds = response.accepted.values.flatten()
+        if (acceptedIds.isNotEmpty()) db.syncRejectionDao().resolveByRecord(acceptedIds)
+
+        recordRejections(eventId, response.rejected)
+
+        val accepted = acceptedIds.size
         return accepted to response.rejected
+    }
+
+    /**
+     * Guarda o que o servidor recusou.
+     *
+     * O registro continua marcado como pendente e sera reenviado; o que muda
+     * e que agora existe rastro do motivo, e a tela de pendencias consegue
+     * mostrar ao operador em vez de deixar o item rodando em silencio.
+     */
+    private suspend fun recordRejections(eventId: String, rejected: List<PushRejection>) {
+        if (rejected.isEmpty()) return
+
+        val now = System.currentTimeMillis()
+        db.syncRejectionDao().upsertAll(
+            rejected.map {
+                SyncRejectionEntity(
+                    // Id deterministico: a mesma recusa repetida no proximo
+                    // ciclo atualiza a linha em vez de empilhar duplicatas.
+                    id = "${it.collection}:${it.id}",
+                    eventId = eventId,
+                    collection = it.collection,
+                    recordId = it.id,
+                    reason = it.reason,
+                    rejectedAtMs = now,
+                )
+            },
+        )
     }
 
     private fun IncidentEntity.toPush() = PushIncident(
@@ -143,6 +207,110 @@ class SyncRepository(
                 )
             },
         )
+
+    private fun TripEntity.toPush() = PushTrip(
+        id = id,
+        status = status,
+        checkedInAt = Time.toIsoOrNull(checkedInAtMs),
+        startedAt = Time.toIsoOrNull(startedAtMs),
+        finishedAt = Time.toIsoOrNull(finishedAtMs),
+        odometerStart = odometerStart,
+        odometerEnd = odometerEnd,
+        fuelStart = fuelStart,
+        fuelEnd = fuelEnd,
+        aggregateBoarded = aggregateBoarded,
+        vehicleReturned = vehicleReturned,
+        latitude = latitude,
+        longitude = longitude,
+        notes = notes,
+        clientCreatedAt = Time.toIso(updatedAtMs),
+    )
+
+    private fun TripStopEntity.toPush() = PushTripStop(
+        id = id,
+        tripId = tripId,
+        sortOrder = sortOrder,
+        name = name,
+        kind = kind,
+        scheduledAt = Time.toIsoOrNull(scheduledAtMs),
+        arrivedAt = Time.toIsoOrNull(arrivedAtMs),
+        latitude = latitude,
+        longitude = longitude,
+        clientCreatedAt = Time.toIso(updatedAtMs),
+    )
+
+    private fun TripPassengerEntity.toPush() = PushTripPassenger(
+        id = id,
+        tripId = tripId,
+        personId = personId,
+        name = name,
+        status = status,
+        boardedAt = Time.toIsoOrNull(boardedAtMs),
+        droppedAt = Time.toIsoOrNull(droppedAtMs),
+        boardedStopName = boardedStopName,
+        notes = notes,
+        clientCreatedAt = Time.toIso(updatedAtMs),
+    )
+
+    private fun VehicleCheckEntity.toPush(answers: List<VehicleCheckAnswerEntity>) =
+        PushVehicleCheck(
+            id = id,
+            tripId = tripId,
+            vehicleId = vehicleId,
+            kind = kind,
+            status = status,
+            startedAt = Time.toIsoOrNull(startedAtMs),
+            completedAt = Time.toIsoOrNull(completedAtMs),
+            odometer = odometer,
+            fuelLevel = fuelLevel,
+            blocked = blocked,
+            overrideReason = overrideReason,
+            overrideAt = Time.toIsoOrNull(overrideAtMs),
+            latitude = latitude,
+            longitude = longitude,
+            notes = notes,
+            clientCreatedAt = Time.toIso(updatedAtMs),
+            answers = answers.map {
+                PushVehicleCheckAnswer(
+                    id = it.id,
+                    itemKey = it.itemKey,
+                    answer = it.answer,
+                    critical = it.critical,
+                    notes = it.notes,
+                    answeredAt = Time.toIso(it.answeredAtMs),
+                )
+            },
+        )
+
+    private fun ParkingAccessEntity.toPush() = PushParkingAccess(
+        id = id,
+        sectorId = sectorId,
+        sectorName = sectorName,
+        credential = credential,
+        plate = plate,
+        direction = direction,
+        authorized = authorized,
+        reason = reason,
+        occurredAt = Time.toIso(occurredAtMs),
+        latitude = latitude,
+        longitude = longitude,
+        notes = notes,
+        clientCreatedAt = Time.toIso(updatedAtMs),
+    )
+
+    private fun SustainabilityUpdateEntity.toPush() = PushSustainabilityUpdate(
+        id = id,
+        taskId = taskId,
+        status = status,
+        comment = comment,
+        justification = justification,
+        answeredAt = Time.toIso(answeredAtMs),
+        authorName = authorName,
+        latitude = latitude,
+        longitude = longitude,
+        incidentId = incidentId,
+        clientCreatedAt = Time.toIso(updatedAtMs),
+    )
 
     private fun PendingAttachmentEntity.toPush(): PushAttachment? {
         val file = File(localPath)
@@ -391,6 +559,9 @@ class SyncRepository(
                 },
         )
 
+        pullMobility(response)
+        pullSustainability(response)
+
         db.syncStateDao().put(
             SyncStateEntity(
                 eventId = eventId,
@@ -402,7 +573,178 @@ class SyncRepository(
 
         return response.areas.size + response.people.size + response.incidents.size +
             response.alerts.size + response.checklistTemplates.size +
-            response.checklistExecutions.size
+            response.checklistExecutions.size + response.trips.size +
+            response.tripPassengers.size + response.sustainabilityTasks.size
+    }
+
+    /**
+     * Logistica & Mobilidade.
+     *
+     * Vale a mesma precedencia do resto do app: missao, parada ou passageiro
+     * com fila local pendente nao e sobrescrito pelo pull — o que o motorista
+     * registrou no veiculo manda ate o servidor confirmar.
+     */
+    private suspend fun pullMobility(response: PullResponse) {
+        val mobility = db.mobilityDao()
+
+        mobility.upsertVehicles(
+            response.vehicles.map {
+                VehicleEntity(
+                    id = it.id,
+                    eventId = it.eventId,
+                    code = it.code,
+                    type = it.type,
+                    plate = it.plate,
+                    model = it.model,
+                    color = it.color,
+                    capacity = it.capacity,
+                    accessible = it.accessible,
+                    armored = it.armored,
+                    companyName = it.companyName,
+                    status = it.status,
+                    updatedAtMs = Time.parseOr(it.updatedAt, 0),
+                    deleted = it.deletedAt != null,
+                )
+            },
+        )
+
+        val pendingTripIds = mobility.pendingTrips().map { it.id }.toSet()
+        mobility.upsertTrips(
+            response.trips
+                .filterNot { it.id in pendingTripIds }
+                .map {
+                    TripEntity(
+                        id = it.id,
+                        eventId = it.eventId,
+                        code = it.code,
+                        service = it.service,
+                        vehicleId = it.vehicleId,
+                        driverPersonId = it.driverPersonId,
+                        routeName = it.routeName,
+                        originName = it.originName,
+                        destinationName = it.destinationName,
+                        scheduledStartMs = Time.parse(it.scheduledStart),
+                        scheduledEndMs = Time.parse(it.scheduledEnd),
+                        status = it.status,
+                        checkedInAtMs = Time.parse(it.checkedInAt),
+                        startedAtMs = Time.parse(it.startedAt),
+                        finishedAtMs = Time.parse(it.finishedAt),
+                        odometerStart = it.odometerStart,
+                        odometerEnd = it.odometerEnd,
+                        fuelStart = it.fuelStart,
+                        fuelEnd = it.fuelEnd,
+                        capacity = it.capacity,
+                        aggregateBoarded = it.aggregateBoarded,
+                        latitude = null,
+                        longitude = null,
+                        notes = it.notes,
+                        vehicleReturned = it.vehicleReturned,
+                        updatedAtMs = Time.parseOr(it.updatedAt, 0),
+                        deleted = it.deletedAt != null,
+                    )
+                },
+        )
+
+        val pendingStopIds = mobility.pendingStops().map { it.id }.toSet()
+        mobility.upsertStops(
+            response.tripStops
+                .filterNot { it.id in pendingStopIds }
+                .map {
+                    TripStopEntity(
+                        id = it.id,
+                        tripId = it.tripId,
+                        sortOrder = it.sortOrder,
+                        name = it.name,
+                        kind = it.kind,
+                        scheduledAtMs = Time.parse(it.scheduledAt),
+                        arrivedAtMs = Time.parse(it.arrivedAt),
+                        latitude = it.latitude,
+                        longitude = it.longitude,
+                        instructions = it.instructions,
+                        updatedAtMs = Time.parseOr(it.updatedAt, 0),
+                        deleted = it.deletedAt != null,
+                    )
+                },
+        )
+
+        val pendingPassengerIds = mobility.pendingPassengers().map { it.id }.toSet()
+        mobility.upsertPassengers(
+            response.tripPassengers
+                .filterNot { it.id in pendingPassengerIds }
+                .map {
+                    TripPassengerEntity(
+                        id = it.id,
+                        tripId = it.tripId,
+                        personId = it.personId,
+                        name = it.name,
+                        badgeCode = it.badgeCode,
+                        boardingStopName = it.boardingStopName,
+                        status = it.status,
+                        boardedAtMs = Time.parse(it.boardedAt),
+                        droppedAtMs = Time.parse(it.droppedAt),
+                        boardedStopName = it.boardedStopName,
+                        notes = it.notes,
+                        updatedAtMs = Time.parseOr(it.updatedAt, 0),
+                        deleted = it.deletedAt != null,
+                    )
+                },
+        )
+
+        mobility.upsertSectors(
+            response.parkingSectors.map {
+                ParkingSectorEntity(
+                    id = it.id,
+                    eventId = it.eventId,
+                    name = it.name,
+                    capacity = it.capacity,
+                    occupied = it.occupied,
+                    blocked = it.blocked,
+                    notes = it.notes,
+                    updatedAtMs = Time.parseOr(it.updatedAt, 0),
+                    deleted = it.deletedAt != null,
+                )
+            },
+        )
+    }
+
+    /**
+     * Direitos Humanos & Sustentabilidade.
+     *
+     * A tarefa respondida offline guarda `lastAnsweredAtMs` local; o pull nao
+     * pode apaga-lo enquanto a resposta nao subiu, senao o item volta a
+     * parecer intocado e alguem refaz a ronda.
+     */
+    private suspend fun pullSustainability(response: PullResponse) {
+        val dao = db.sustainabilityDao()
+        val pendingTasks = dao.pendingTasks().associateBy { it.id }
+
+        dao.upsertTasks(
+            response.sustainabilityTasks
+                .filterNot { it.id in pendingTasks }
+                .map {
+                    SustainabilityTaskEntity(
+                        id = it.id,
+                        eventId = it.eventId,
+                        theme = it.theme,
+                        subtheme = it.subtheme,
+                        title = it.title,
+                        description = it.description,
+                        phase = it.phase,
+                        criterion = it.criterion,
+                        priority = it.priority,
+                        status = it.status,
+                        dueAtMs = Time.parse(it.dueAt),
+                        responsibleName = it.responsibleName,
+                        areaId = it.areaId,
+                        locationName = it.locationName,
+                        recurring = it.recurring,
+                        requiresEvidence = it.requiresEvidence,
+                        lastAnsweredAtMs = null,
+                        updatedAtMs = Time.parseOr(it.updatedAt, 0),
+                        deleted = it.deletedAt != null,
+                    )
+                },
+        )
     }
 
     suspend fun recordError(eventId: String, message: String) {

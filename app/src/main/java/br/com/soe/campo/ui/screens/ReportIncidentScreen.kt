@@ -1,11 +1,7 @@
 package br.com.soe.campo.ui.screens
 
 import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -298,49 +294,4 @@ fun ReportIncidentScreen(
             Spacer(Modifier.height(8.dp))
         }
     }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChipGrid(
-    options: List<Pair<String, String>>,
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        options.forEach { (value, label) ->
-            FilterChip(
-                selected = selected == value,
-                onClick = { onSelect(value) },
-                label = { Text(label) },
-            )
-        }
-    }
-}
-
-private fun hasLocationPermission(context: Context) =
-    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-        PackageManager.PERMISSION_GRANTED
-
-/**
- * Usamos a ultima posicao conhecida em vez de pedir um fix novo: em campo o
- * operador nao pode esperar o GPS, e a precisao aproximada ja resolve para
- * localizar a ocorrencia dentro do perimetro do evento.
- */
-@SuppressLint("MissingPermission")
-private fun lastKnownLocation(context: Context): Location? {
-    if (!hasLocationPermission(context)) return null
-
-    val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-        ?: return null
-
-    return listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-        .mapNotNull { provider ->
-            runCatching { manager.getLastKnownLocation(provider) }.getOrNull()
-        }
-        .maxByOrNull { it.time }
 }

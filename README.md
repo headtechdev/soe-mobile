@@ -21,6 +21,25 @@ SQLite local e sobe para o Web SaaS quando houver rede.
 | Execução de checklist | `ui/screens/ChecklistRunScreen.kt` | Conforme / Não conforme / N-A, observação e evidência fotográfica |
 | Alertas | `ui/screens/AlertsScreen.kt` | Geral, por área e crítico, com confirmação de ciência |
 | Perfil | `ui/screens/ProfileScreen.kt` | Nome, função, área, turno, check-in/out e estado da fila |
+| Fila e conflitos | `ui/screens/SyncQueueScreen.kt` | O que falta subir e o que o servidor recusou, com o motivo |
+
+### Logística & Mobilidade
+
+| Tela | Arquivo | O que faz |
+| --- | --- | --- |
+| Missões | `ui/screens/MissionsScreen.kt` | Viagens, transfers e shuttles atribuídos, em ordem de urgência |
+| Execução da missão | `ui/screens/TripScreen.kt` | Check-in, pré-operacional, embarque, partida/paradas e check-out |
+| Checklist do veículo | `ui/screens/VehicleCheckScreen.kt` | Pré-operacional e encerramento, com bloqueio crítico e exceção autorizada |
+| Embarque | `ui/screens/BoardingScreen.kt` | Lista nominal ou contagem agregada, com trava de lotação |
+| Estacionamento e tráfego | `ui/screens/ParkingScreen.kt` | Valida credencial e placa, registra entrada/saída, recusa e ocupação |
+| SOS | `ui/screens/SosDialog.kt` | Ocorrência crítica em dois toques, com localização e vínculo da missão |
+
+### Direitos Humanos & Sustentabilidade
+
+| Tela | Arquivo | O que faz |
+| --- | --- | --- |
+| Tarefas | `ui/screens/SustainabilityScreen.kt` | Itens por fase e tema, destacando obrigatório, crítico e vencido |
+| Execução da tarefa | `ui/screens/SustainabilityTaskScreen.kt` | Responde, justifica, anexa foto/vídeo/arquivo e abre ação corretiva |
 
 ## Regras que o app aplica em campo
 
@@ -31,6 +50,16 @@ uma regra:
   fotográfica quando o modelo exige. "Não aplicável" conta como resposta.
 - **Rascunho nunca se perde:** o bloqueio acontece depois de gravar o que já foi
   preenchido.
+- **Partida bloqueada** por não conformidade crítica no pré-operacional do
+  veículo. A exceção é possível, mas exige justificativa e quem autorizou, e
+  sobe junto com o checklist — o bloqueio nunca some em silêncio.
+- **Lotação não passa da capacidade** cadastrada do veículo, nem pela lista
+  nominal nem pela contagem agregada.
+- **"Não aplicável" e "não atendido"** em item socioambiental exigem
+  justificativa. A regra está no repositório, não na tela: nenhum caminho de
+  gravação escapa dela.
+- **Registro recusado pelo servidor não desaparece:** fica na tela de fila e
+  conflitos, com o motivo, até alguém resolver.
 - **Alerta com repasse:** quando o supervisor recebe um alerta em nome de gente
   sem app, a tela diz quantas pessoas dependem dele e o botão vira "Confirmar
   ciência minha e da equipe" (`relayCount`, vindo do servidor).
@@ -54,6 +83,27 @@ operador digitou tem precedência até ser confirmado pelo servidor.
 
 O `SyncWorker` (WorkManager) roda a cada 15 minutos exigindo rede, e também sob
 demanda depois de cada gravação em campo.
+
+### Notificações
+
+Não há push: o aparelho não tem FCM configurado. O que existe são notificações
+**locais**, emitidas pelo próprio `SyncWorker` quando o pull traz coisa nova —
+alerta crítico, tarefa socioambiental atribuída, prazo que acabou de vencer e
+missão nova. Duas travas contra barulho: nada é notificado no primeiro
+sincronismo, e o teto é de cinco por ciclo e por categoria. Push de verdade
+continua sendo decisão de produto em aberto nos dois módulos.
+
+### Dependências do servidor
+
+Os dois módulos novos esperam coleções que o Web SaaS ainda precisa expor:
+
+- **pull:** `vehicles`, `trips`, `tripStops`, `tripPassengers`,
+  `parkingSectors` e `sustainabilityTasks`;
+- **push:** `trips`, `tripStops`, `tripPassengers`, `vehicleChecks`,
+  `parkingAccesses` e `sustainabilityUpdates`.
+
+Enquanto não existirem, as telas abrem vazias — nada quebra, mas também não há
+o que operar.
 
 ## Rodando
 

@@ -19,8 +19,28 @@ object Routes {
     const val CHECKLIST_RUN = "checklists/execucao/{executionId}"
     const val ALERTS = "alertas"
     const val PROFILE = "perfil"
+    const val SYNC_QUEUE = "sincronismo/fila"
+
+    // Logistica & Mobilidade
+    const val MISSIONS = "logistica/missoes"
+    const val TRIP = "logistica/missoes/{tripId}"
+    const val TRIP_BOARDING = "logistica/missoes/{tripId}/embarque"
+    const val VEHICLE_CHECK = "logistica/checklist/{checkId}"
+    const val PARKING = "logistica/estacionamento"
+
+    // Direitos Humanos & Sustentabilidade
+    const val SUSTAINABILITY = "sustentabilidade"
+    const val SUSTAINABILITY_TASK = "sustentabilidade/{taskId}"
 
     fun checklistRun(executionId: String) = "checklists/execucao/$executionId"
+
+    fun trip(tripId: String) = "logistica/missoes/$tripId"
+
+    fun boarding(tripId: String) = "logistica/missoes/$tripId/embarque"
+
+    fun vehicleCheck(checkId: String) = "logistica/checklist/$checkId"
+
+    fun sustainabilityTask(taskId: String) = "sustentabilidade/$taskId"
 }
 
 @Composable
@@ -52,6 +72,90 @@ fun SoeNavHost(
                 onOpenChecklists = { navController.navigate(Routes.CHECKLISTS) },
                 onOpenAlerts = { navController.navigate(Routes.ALERTS) },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                onOpenMissions = { navController.navigate(Routes.MISSIONS) },
+                onOpenSustainability = { navController.navigate(Routes.SUSTAINABILITY) },
+                onOpenSyncQueue = { navController.navigate(Routes.SYNC_QUEUE) },
+            )
+        }
+
+        composable(Routes.SYNC_QUEUE) {
+            SyncQueueScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+        }
+
+        // ------------------------------------------ Logistica & Mobilidade
+
+        composable(Routes.MISSIONS) {
+            MissionsScreen(
+                viewModel = viewModel,
+                onOpenTrip = { navController.navigate(Routes.trip(it)) },
+                onOpenParking = { navController.navigate(Routes.PARKING) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = Routes.TRIP,
+            arguments = listOf(navArgument("tripId") { type = NavType.StringType }),
+        ) { entry ->
+            val tripId = entry.arguments?.getString("tripId").orEmpty()
+            TripScreen(
+                viewModel = viewModel,
+                tripId = tripId,
+                onOpenCheck = { navController.navigate(Routes.vehicleCheck(it)) },
+                onOpenBoarding = { navController.navigate(Routes.boarding(tripId)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = Routes.TRIP_BOARDING,
+            arguments = listOf(navArgument("tripId") { type = NavType.StringType }),
+        ) { entry ->
+            BoardingScreen(
+                viewModel = viewModel,
+                tripId = entry.arguments?.getString("tripId").orEmpty(),
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = Routes.VEHICLE_CHECK,
+            arguments = listOf(navArgument("checkId") { type = NavType.StringType }),
+        ) { entry ->
+            VehicleCheckScreen(
+                viewModel = viewModel,
+                checkId = entry.arguments?.getString("checkId").orEmpty(),
+                onDone = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.PARKING) {
+            ParkingScreen(
+                viewModel = viewModel,
+                onReportIncident = { navController.navigate(Routes.REPORT_INCIDENT) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        // -------------------------- Direitos Humanos & Sustentabilidade
+
+        composable(Routes.SUSTAINABILITY) {
+            SustainabilityScreen(
+                viewModel = viewModel,
+                onOpenTask = { navController.navigate(Routes.sustainabilityTask(it)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = Routes.SUSTAINABILITY_TASK,
+            arguments = listOf(navArgument("taskId") { type = NavType.StringType }),
+        ) { entry ->
+            SustainabilityTaskScreen(
+                viewModel = viewModel,
+                taskId = entry.arguments?.getString("taskId").orEmpty(),
+                onBack = { navController.popBackStack() },
             )
         }
 
