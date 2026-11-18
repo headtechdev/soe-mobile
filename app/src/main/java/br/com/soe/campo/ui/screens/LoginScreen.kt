@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,6 +34,7 @@ fun LoginScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val session by viewModel.session.collectAsStateWithLifecycle()
+    val online by viewModel.online.collectAsStateWithLifecycle()
 
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -70,6 +72,29 @@ fun LoginScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        // O app opera offline, mas a entrada nao: e no login que o servidor
+        // diz em qual evento o operador esta escalado hoje.
+        if (!online) {
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(Icons.Default.WifiOff, contentDescription = null)
+                    Text(
+                        "Sem conexao. Entrar exige rede — e no login que o app descobre " +
+                            "em qual evento voce esta escalado hoje.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -129,7 +154,7 @@ fun LoginScreen(
 
         Button(
             onClick = { viewModel.login(email, password, baseUrl, onLoggedIn) },
-            enabled = !state.loading && email.isNotBlank() && password.isNotBlank(),
+            enabled = !state.loading && online && email.isNotBlank() && password.isNotBlank(),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -141,7 +166,7 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
-                Text("Entrar")
+                Text(if (online) "Entrar" else "Sem conexao")
             }
         }
 

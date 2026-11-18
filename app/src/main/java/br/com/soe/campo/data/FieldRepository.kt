@@ -28,7 +28,17 @@ class FieldRepository(
 
     // ------------------------------------------------------------ Login
 
+    /**
+     * Entra no app e abre o evento do dia.
+     *
+     * Exige rede: alem de autenticar, o login precisa ler a escala para saber
+     * em qual evento o operador vai trabalhar hoje. Sem essa resposta nao da
+     * para abrir o app em evento nenhum — abrir "no ultimo" colocaria registro
+     * de campo na operacao errada.
+     */
     suspend fun login(email: String, password: String) {
+        if (!Connectivity.isOnline(context)) throw OfflineLoginException()
+
         val api = apiProvider()
         val installationId = session.installationId()
 
@@ -65,62 +75,58 @@ class FieldRepository(
     }
 
     /**
-     * Descobre em qual evento este usuario esta operando.
+     * Descobre em qual evento este usuario esta operando hoje.
      *
      * Roda no login e tambem no sincronismo, porque o vinculo costuma ser criado
      * na web depois que o aparelho ja esta em campo. Obrigar o operador a sair e
      * entrar de novo para enxergar o evento e um pedido que nao se faz no meio de
      * uma operacao.
      *
+     * A escolha e do [AssignmentPicker]: quem opera em mais de um evento entra
+     * naquele para o qual esta escalado no dia. O `profile` que vem no login
+     * so entra em cena quando o bootstrap nao lista escala nenhuma — ali ele e
+     * a unica pista que temos.
+     *
      * @return true se um evento ficou ativo.
      */
     suspend fun resolveAssignment(
         api: SoeApi? = null,
         profile: RemoteProfile? = null,
+        nowMs: Long = System.currentTimeMillis(),
     ): Boolean {
-        // O perfil vem no proprio login quando o usuario esta vinculado a uma
-        // pessoa do evento; senao caimos no bootstrap para escolher o evento.
-        if (profile != null) {
-            session.saveAssignment(
-                eventId = profile.eventId,
-                eventName = profile.eventName,
-                personId = profile.personId,
-                areaName = profile.area?.name,
-                roleName = profile.jobRole?.name,
-                shiftName = profile.shift?.name,
-                badge = profile.badgeCode,
-            )
-            return true
-        }
-
-        // So agora precisamos de rede: quando o proprio login ja trouxe o perfil,
-        // nem chegamos aqui.
         val bootstrap = (api ?: apiProvider()).bootstrap()
-        val assignment = bootstrap.assignments.firstOrNull()
-        if (assignment != null) {
-            session.saveAssignment(
-                eventId = assignment.event.id,
-                eventName = assignment.event.name,
-                personId = assignment.personId,
-                areaName = assignment.area?.name,
-                roleName = assignment.jobRole?.name,
-                shiftName = assignment.shift?.name,
-                badge = assignment.badgeCode,
-            )
-            return true
+
+        val choice = AssignmentPicker.pick(
+            assignments = bootstrap.assignments,
+            events = bootstrap.events,
+            nowMs = nowMs,
+        ).getOrElse { failure ->
+            // Sem escala hoje, o perfil do login ainda vale: ele e a escala que
+            // o proprio servidor escolheu para este usuario.
+            if (profile != null) {
+                session.saveAssignment(
+                    eventId = profile.eventId,
+                    eventName = profile.eventName,
+                    personId = profile.personId,
+                    areaName = profile.area?.name,
+                    roleName = profile.jobRole?.name,
+                    shiftName = profile.shift?.name,
+                    badge = profile.badgeCode,
+                )
+                return true
+            }
+            throw failure
         }
 
-        val fallback = bootstrap.events.firstOrNull()
-            ?: error("Nenhum evento atribuido a este usuario.")
-
+        val assignment = choice.assignment
         session.saveAssignment(
-            eventId = fallback.id,
-            eventName = fallback.name,
-            personId = null,
-            areaName = null,
-            roleName = null,
-            shiftName = null,
-            badge = null,
+            eventId = choice.event.id,
+            eventName = choice.event.name,
+            personId = assignment?.personId,
+            areaName = assignment?.area?.name,
+            roleName = assignment?.jobRole?.name,
+            shiftName = assignment?.shift?.name,
+            badge = assignment?.badgeCode,
         )
         return true
     }

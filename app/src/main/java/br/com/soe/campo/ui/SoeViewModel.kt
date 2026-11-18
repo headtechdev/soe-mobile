@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import br.com.soe.campo.SoeApplication
+import br.com.soe.campo.data.Connectivity
+import br.com.soe.campo.data.NoAssignmentTodayException
+import br.com.soe.campo.data.OfflineLoginException
 import br.com.soe.campo.data.SessionStore
 import br.com.soe.campo.data.local.SyncRejectionEntity
 import br.com.soe.campo.sync.SyncWorker
@@ -111,6 +114,13 @@ class SoeViewModel(application: Application) : AndroidViewModel(application) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /**
+     * Rede do aparelho. A tela de login usa para avisar antes de o operador
+     * digitar a senha, em vez de deixa-lo descobrir no erro.
+     */
+    val online: StateFlow<Boolean> = Connectivity.observe(application)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     fun login(email: String, password: String, baseUrl: String?, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _uiState.value = UiState(loading = true)
@@ -173,6 +183,9 @@ class SoeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun friendlyMessage(error: Exception): String = when (error) {
+        // Estas duas ja chegam escritas para o operador.
+        is OfflineLoginException, is NoAssignmentTodayException -> error.message!!
+
         is java.net.UnknownHostException,
         is java.net.ConnectException,
         is java.net.SocketTimeoutException,
